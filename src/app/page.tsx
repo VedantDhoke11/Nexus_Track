@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight, Calendar, Rocket, Users } from "lucide-react";
+import { ArrowRight, Calendar, Users, Shield, Zap, CheckCircle2, BarChart3, Clock, Sparkles, Target, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Card,
   CardContent,
@@ -12,166 +13,255 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { hackathons as initialHackathons, Hackathon } from "@/lib/data";
-
-const STORAGE_KEY = "nexustrack_hackathons";
+import { Hackathon } from "@/lib/data";
+import { db } from "@/lib/db";
 
 export default function Home() {
-  const [hackathons, setHackathons] = useState<Hackathon[]>(initialHackathons);
+  const [hackathons, setHackathons] = useState<Hackathon[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setHackathons(JSON.parse(raw));
-    } catch {}
+    async function fetchHacks() {
+      try {
+        const hacks = await db.getHackathons();
+        setHackathons(hacks);
+      } catch (err) {
+        console.error("Failed to fetch hackathons:", err);
+      }
+    }
+    fetchHacks();
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
+    <main className="min-h-screen bg-background text-foreground selection:bg-indigo-100">
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[radial-gradient(circle_at_50%_-20%,rgba(99,102,241,0.1),transparent_50%)]"></div>
+
       {/* Navbar */}
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 border border-blue-500/40">
-              <Rocket className="h-4 w-4 text-blue-400" />
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2.5 group cursor-pointer">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 shadow-sm border border-border/40 group-hover:scale-110 transition-transform duration-300">
+              <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-sm font-semibold tracking-tight text-slate-50">
-              NexusTrack
+            <span className="text-xl font-black tracking-tight text-foreground font-sans">
+              Nexus<span className="text-indigo-600">Track.</span>
             </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="#hackathons"
-              className="text-xs sm:text-sm text-slate-300 hover:text-slate-50"
-            >
-              View hackathons
-            </Link>
-            <Link href="/login">
-              <Button size="sm">Login</Button>
-            </Link>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-8">
+            <Link href="#features" className="text-sm font-semibold text-muted-foreground hover:text-indigo-600 transition-colors">Features</Link>
+            <Link href="#hackathons" className="text-sm font-semibold text-muted-foreground hover:text-indigo-600 transition-colors">Hackathons</Link>
+             <Link href="#" className="text-sm font-semibold text-muted-foreground hover:text-indigo-600 transition-colors">Documentation</Link>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link href="/login" className="text-sm font-semibold text-muted-foreground hover:text-indigo-600 transition-colors">Log in</Link>
+            <Button asChild size="sm" className="rounded-full px-6">
+              <Link href="/register">Join the Network</Link>
+            </Button>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Hero */}
-      <section className="border-b border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900/60">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 px-4 py-16 text-center md:flex-row md:items-start md:text-left">
-          <div className="flex-1 space-y-6">
-            <p className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1 text-xs text-slate-300">
-              <Calendar className="h-3 w-3 text-blue-400" />
-              Manage hackathons, teams & judging in one place.
-            </p>
-            <div className="space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
-                Run hackathons with clarity,
-                <span className="text-blue-400"> not chaos.</span>
-              </h1>
-              <p className="max-w-xl text-sm text-slate-300 sm:text-base">
-                NexusTrack helps admins, participants, and judges coordinate
-                hackathons from one streamlined dashboard — no extra tooling or
-                backend setup required.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button asChild size="lg">
-                <Link href="#hackathons" className="flex items-center gap-2">
-                  View Hackathons
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/login">Sign in as test user</Link>
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                No backend required — localStorage only.
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-3 w-3 text-slate-500" />
-                Admin · Participant · Judge views.
-              </div>
-            </div>
-          </div>
+      {/* Hero Section */}
+      <section className="relative pt-44 pb-32 px-6 flex flex-col items-center text-center overflow-hidden">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold uppercase tracking-widest mb-10 animate-bounce cursor-default">
+           <Sparkles className="w-3.5 h-3.5" />
+           <span>Enterprise ready platform</span>
+        </div>
+        
+        <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-foreground mb-8 max-w-5xl leading-[0.9]">
+          Management <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-br from-indigo-600 via-indigo-500 to-indigo-400">
+            Engineered for Innovation.
+          </span>
+        </h1>
+        
+        <p className="max-w-2xl text-xl text-muted-foreground mb-12 font-medium leading-relaxed mx-auto italic">
+          The ultimate control center for high-stakes hackathons. 
+          Scalable, reliable, and exceptionally intuitive.
+        </p>
+        
+        <div className="flex flex-wrap items-center justify-center gap-6">
+          <Button asChild size="lg" className="rounded-2xl h-14 px-10 shadow-xl shadow-indigo-500/25">
+            <Link href="/register" className="flex items-center gap-2">
+              Launch your event
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </Button>
+          <Button variant="outline" size="lg" className="rounded-2xl h-14 px-10 border-slate-200" asChild>
+            <Link href="#hackathons">
+              Explore Active Missions
+            </Link>
+          </Button>
         </div>
       </section>
 
-      {/* Hackathon cards */}
-      <section
-        id="hackathons"
-        className="bg-slate-950/60 py-10 border-b border-slate-800/80"
-      >
-        <div className="mx-auto max-w-6xl px-4 space-y-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                Live & upcoming hackathons
-              </h2>
-              <p className="text-sm text-slate-400">
-                Explore a few sample events wired to local mock data.
-              </p>
-            </div>
-          </div>
+      {/* Stats Board */}
+      <div className="max-w-7xl mx-auto px-6 mb-40">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 py-12 border-y border-slate-200/60 bg-white/40 rounded-3xl backdrop-blur-sm shadow-sm px-10">
+           {[
+             { label: "Active Nodes", value: "2.4K+", color: "text-indigo-600" },
+             { label: "Total Transactions", value: "$4.1M", color: "text-foreground" },
+             { label: "Uptime Protocol", value: "99.98%", color: "text-green-600" },
+             { label: "Global Reach", value: "82+", color: "text-indigo-400" },
+           ].map((stat, i) => (
+             <div key={i} className="text-center">
+                <p className={`text-4xl font-black tracking-tighter mb-1 ${stat.color}`}>{stat.value}</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+             </div>
+           ))}
+        </div>
+      </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {hackathons.map((hack) => (
-              <Card key={hack.id} className="flex flex-col justify-between">
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">
-                    {hack.title}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-3">
-                    {hack.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 text-xs sm:text-sm">
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span>
-                      {hack.startDate} → {hack.endDate}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Prize pool</span>
-                    <span className="font-medium text-blue-400">
-                      {hack.prize}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Status</span>
-                    <span
-                      className={
-                        hack.status === "upcoming"
-                          ? "rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 border border-amber-500/40"
-                          : hack.status === "ongoing"
-                          ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 border border-emerald-500/40"
-                          : "rounded-full bg-slate-700/30 px-2 py-0.5 text-xs font-medium text-slate-200 border border-slate-700"
-                      }
-                    >
-                      {hack.status === "upcoming"
-                        ? "Upcoming"
-                        : hack.status === "ongoing"
-                        ? "In progress"
-                        : "Completed"}
-                    </span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    asChild
-                  >
-                    {/* ✅ Points to src/app/hackathon/[id]/page.tsx */}
-                    <Link href={`/hackathon/${hack.id}`}>View details</Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+      {/* Features Grid */}
+      <section id="features" className="max-w-7xl mx-auto px-6 mb-40">
+        <div className="text-center mb-20">
+          <h2 className="text-4xl font-black tracking-tight mb-4">Core Infrastructure</h2>
+          <p className="text-muted-foreground font-medium">Built to withstand the most intense development cycles.</p>
+        </div>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          {[
+            {
+              title: "Adaptive Pipelines",
+              desc: "Automated submission and review workflows that scale with your event density.",
+              icon: <Target className="h-6 w-6 text-indigo-600" />
+            },
+            {
+              title: "Unified Registry",
+              desc: "Centralized team management with real-time sync across all organizational nodes.",
+              icon: <Users className="h-6 w-6 text-indigo-600" />
+            },
+            {
+              title: "Encrypted Scoring",
+              desc: "Multi-layered validation protocols for transparent and fair judge evaluations.",
+              icon: <Shield className="h-6 w-6 text-indigo-600" />
+            }
+          ].map((f, i) => (
+            <div key={i} className="p-10 premium-card group">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mb-8 border border-indigo-100 group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-300">
+                <div className="group-hover:text-white transition-colors">
+                  {f.icon}
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-4">{f.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed font-medium">{f.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
+
+      {/* Live Hub */}
+      <section id="hackathons" className="max-w-7xl mx-auto px-6 pb-40">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+          <div>
+            <h2 className="text-4xl font-black tracking-tight mb-4">Live Hub</h2>
+            <p className="text-muted-foreground font-medium">Currently active and upcoming missions across the network.</p>
+          </div>
+          <Button variant="ghost" size="sm" className="font-bold text-indigo-600 hover:text-indigo-700 hover:bg-transparent" asChild>
+            <Link href="/register">View Full Registry <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {hackathons.map((hack) => (
+            <Card key={hack.id} className="premium-card flex flex-col group overflow-hidden border-none shadow-xl shadow-slate-200/50">
+              <div className="h-4 bg-gradient-to-r from-indigo-600 to-indigo-400 group-hover:h-6 transition-all duration-300"></div>
+              <CardHeader className="pb-4">
+                <div className="flex justify-between items-start mb-4">
+                   <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                     hack.status === 'upcoming' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 
+                     hack.status === 'ongoing' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                     'bg-slate-50 text-slate-400 border-slate-100'
+                   }`}>
+                     {hack.status}
+                   </div>
+                   <div className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50/50 px-2.5 py-1 rounded-full">
+                      <Rocket className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-bold">{hack.mode}</span>
+                   </div>
+                </div>
+                <CardTitle className="text-2xl font-black text-foreground leading-tight">
+                  {hack.title}
+                </CardTitle>
+                <CardDescription className="line-clamp-2 mt-2 font-medium">
+                  {hack.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 text-sm space-y-4 pt-4">
+                 <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                       <Calendar className="w-4 h-4" />
+                       <span className="text-xs font-bold uppercase tracking-wider">Start Date</span>
+                    </div>
+                    <span className="text-sm font-bold text-foreground">{hack.startDate}</span>
+                 </div>
+                 <div className="flex justify-between items-center px-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Prize Allocation</span>
+                    <span className="text-base font-black text-indigo-600 tracking-tighter">{hack.prize}</span>
+                 </div>
+              </CardContent>
+              <CardFooter className="pt-6">
+                <Button className="w-full rounded-2xl h-12 shadow-lg shadow-indigo-100" asChild>
+                  <Link href={`/hackathon/${hack.id}`}>Secure Intel</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200/60 py-20 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
+           <div className="space-y-6 max-w-xs">
+             <div className="flex items-center gap-2.5">
+               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900">
+                 <Zap className="h-4 w-4 text-white" />
+               </div>
+               <span className="text-xl font-black tracking-tight text-foreground">NexusTrack</span>
+             </div>
+             <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+               The architectural standard for hackathon operations. Powering the world's most ambitious sprints.
+             </p>
+           </div>
+           
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-20">
+              <div className="space-y-4">
+                 <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Network</h4>
+                 <ul className="space-y-3">
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Nodes</Link></li>
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Protocols</Link></li>
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Registry</Link></li>
+                 </ul>
+              </div>
+              <div className="space-y-4">
+                 <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Operations</h4>
+                 <ul className="space-y-3">
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Support</Link></li>
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Security</Link></li>
+                    <li><Link href="#" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Docs</Link></li>
+                 </ul>
+              </div>
+              <div className="space-y-4 hidden md:block">
+                 <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Security</h4>
+                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100">
+                    <Shield className="h-6 w-6 text-slate-400" />
+                 </div>
+              </div>
+           </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-slate-100 flex justify-between items-center">
+           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">© 2026 NEXUSTRACK GLOBAL OPERATIONS.</p>
+           <div className="flex gap-6">
+              <Zap className="h-4 w-4 text-slate-200" />
+              <BarChart3 className="h-4 w-4 text-slate-200" />
+              <Users className="h-4 w-4 text-slate-200" />
+           </div>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import { db } from './db';
 import { UserRole } from './data';
 
 export interface AuthUser {
@@ -48,11 +49,12 @@ export function getCurrentUser(): AuthUser | null {
   }
 }
 
-export function login(
+export async function login(
   email: string,
   password: string,
   role: UserRole
-): AuthUser | null {
+): Promise<AuthUser | null> {
+  // Check test credentials first
   const match = TEST_CREDENTIALS.find(
     (cred) =>
       cred.email.toLowerCase() === email.toLowerCase() &&
@@ -60,21 +62,38 @@ export function login(
       cred.role === role
   );
 
-  if (!match) {
-    return null;
+  if (match) {
+    const user: AuthUser = {
+      email: match.email,
+      role: match.role
+    };
+    if (isBrowser()) {
+      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    }
+    return user;
   }
 
-  const user: AuthUser = {
-    email: match.email,
-    role: match.role
-  };
-
-  if (isBrowser()) {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  // Otherwise check Supabase profiles
+  try {
+    const profile = await db.getProfileByEmail(email);
+    // For demo purposes, we accept any password for registered users
+    if (profile && profile.role === role) {
+      const user: AuthUser = {
+        email: profile.email,
+        role: profile.role
+      };
+      if (isBrowser()) {
+        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      }
+      return user;
+    }
+  } catch (err) {
+    console.error("Login check failed:", err);
   }
 
-  return user;
+  return null;
 }
+
 
 export function logout() {
   if (!isBrowser()) return;

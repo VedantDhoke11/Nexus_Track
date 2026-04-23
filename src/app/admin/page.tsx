@@ -11,625 +11,307 @@ import {
   Plus,
   Edit2,
   Trash2,
-  X,
-  CheckCircle,
   Menu,
   Bell,
-  SlidersHorizontal
+  Settings,
+  Zap,
+  MoreVertical,
+  Activity,
+  Calendar,
+  Filter,
+  Download,
+  ShieldAlert,
+  ChevronRight,
+  Globe
 } from "lucide-react";
 import { getCurrentUser, logout } from "@/lib/auth";
 import {
   Hackathon,
   HackathonStatus,
   Round,
-  SubmissionType,
-  RoundStatus,
   ScoringCriterion,
   NotificationItem,
   LeaderboardConfig,
 } from "@/lib/data";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-function StatusBadge({ status }: { status: HackathonStatus }) {
-  const map = {
-    upcoming: "bg-amber-500/10 text-amber-400 border-amber-500/40",
-    ongoing: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40",
-    completed: "bg-slate-700/30 text-slate-300 border-slate-700",
-  };
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${map[status]}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-}
-
-interface ModalProps {
-  hack: Partial<Hackathon> | null;
-  onClose: () => void;
-  onSave: (h: Hackathon) => void;
-}
-
-function HackathonModal({ hack, onClose, onSave }: ModalProps) {
-  const [form, setForm] = useState<Partial<Hackathon>>(
-    hack ?? { status: "upcoming", mode: "hybrid" }
-  );
-
-  const set = (k: keyof Hackathon, v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  const handleSave = () => {
-    if (!form.title || !form.startDate || !form.endDate) return;
-    onSave({
-      id: form.id ?? `hack-${Date.now()}`,
-      title: form.title!,
-      description: form.description ?? "",
-      startDate: form.startDate!,
-      endDate: form.endDate!,
-      mode: (form.mode as Hackathon["mode"]) ?? "hybrid",
-      prize: form.prize ?? "TBD",
-      status: form.status as HackathonStatus ?? "upcoming",
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
-          <h2 className="font-semibold text-slate-50">
-            {hack?.id ? "Edit Hackathon" : "Add Hackathon"}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-50">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3 p-5">
-          {[
-            { label: "Title", key: "title", type: "text" },
-            { label: "Description", key: "description", type: "text" },
-            { label: "Start Date", key: "startDate", type: "date" },
-            { label: "End Date", key: "endDate", type: "date" },
-            { label: "Mode (online/offline/hybrid)", key: "mode", type: "text" },
-            { label: "Prize Pool", key: "prize", type: "text" },
-          ].map(({ label, key, type }) => (
-            <div key={key}>
-              <label className="mb-1 block text-xs font-medium text-slate-300">{label}</label>
-              <Input
-                type={type}
-                value={(form as Record<string, string>)[key] ?? ""}
-                onChange={(e) => set(key as keyof Hackathon, e.target.value)}
-                placeholder={label}
-              />
-            </div>
-          ))}
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-300">Status</label>
-            <select
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={form.status ?? "upcoming"}
-              onChange={(e) => set("status", e.target.value)}
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-700 px-5 py-4">
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={handleSave}>
-            <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Save
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type Tab = "overview" | "hackathons" | "rounds" | "criteria" | "notifications";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hacks, setHacks] = useState<Hackathon[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [criteria, setCriteria] = useState<ScoringCriterion[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [leaderboardConfig, setLeaderboardConfig] = useState<LeaderboardConfig>({ visible: true });
-  const [modal, setModal] = useState<Partial<Hackathon> | null | undefined>(undefined);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [roundForm, setRoundForm] = useState({
-    hackathonId: "",
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newHack, setNewHack] = useState({
     title: "",
-    submissionType: "mixed" as SubmissionType,
-    status: "upcoming" as RoundStatus,
+    description: "",
+    startDate: "",
+    mode: "Online",
+    prize: "$0",
   });
-  const [criteriaForm, setCriteriaForm] = useState({
-    hackathonId: "",
-    roundId: "",
-    name: "",
-    maxScore: "10",
-    weightage: "25",
-  });
-  const [notificationForm, setNotificationForm] = useState({
-    title: "",
-    message: "",
-    roles: ["participant"] as Array<"admin" | "participant" | "judge">,
-  });
-  const hackathonWithoutRounds = hacks.filter((h) => !rounds.some((r) => r.hackathonId === h.id)).length;
-  const roundsWithoutCriteria = rounds.filter((r) => !criteria.some((c) => c.roundId === r.id)).length;
 
   useEffect(() => {
     const user = getCurrentUser();
-    if (!user || user.role !== "admin") router.push("/login");
+    if (!user || user.role !== "admin") { router.push("/login"); return; }
     
     async function fetchData() {
       try {
-        const [h, r, c, n, lc] = await Promise.all([
-          db.getHackathons(),
-          db.getRounds(),
-          db.getScoringCriteria(),
-          db.getNotifications(),
-          db.getLeaderboardConfig()
-        ]);
+        const [h, r] = await Promise.all([db.getHackathons(), db.getRounds()]);
         setHacks(h);
         setRounds(r);
-        setCriteria(c);
-        setNotifications(n);
-        setLeaderboardConfig(lc);
-      } catch (err) {
-        console.error("Failed to fetch admin data:", err);
-      }
+        setUserEmail(user!.email);
+        const profile = await db.getProfileByEmail(user!.email);
+        if (profile) setUserName(profile.name);
+      } catch (err) { console.error(err); }
     }
     fetchData();
   }, [router]);
 
   const handleLogout = () => { logout(); router.push("/login"); };
 
-  const saveHack = async (h: Hackathon) => {
-    try {
-      await db.saveHackathon(h);
-      const updated = hacks.find((x) => x.id === h.id)
-        ? hacks.map((x) => (x.id === h.id ? h : x))
-        : [...hacks, h];
-      setHacks(updated);
-      setModal(undefined);
-    } catch (err) {
-      alert("Failed to save hackathon");
-    }
-  };
-
-  const deleteHack = async (id: string) => {
-    try {
-      await db.deleteHackathon(id);
-      const updated = hacks.filter((h) => h.id !== id);
-      setHacks(updated);
-    } catch (err) {
-      alert("Failed to delete hackathon");
-    }
-  };
-
-  const addRound = async () => {
-    if (!roundForm.hackathonId || !roundForm.title.trim()) return;
-    const next: Round = {
-      id: `round-${Date.now()}`,
-      hackathonId: roundForm.hackathonId,
-      title: roundForm.title.trim(),
-      submissionType: roundForm.submissionType,
-      status: roundForm.status,
+  const createHackathon = async () => {
+    if (!newHack.title) return alert("Title is mission-critical.");
+    const hack: Hackathon = {
+      id: `hack-${Date.now()}`,
+      title: newHack.title,
+      description: newHack.description,
+      startDate: newHack.startDate || new Date().toISOString().split('T')[0],
+      endDate: "",
+      mode: newHack.mode as any,
+      prize: newHack.prize,
+      status: "upcoming"
     };
     try {
-      await db.createRound(next);
-      const updated = [...rounds, next];
-      setRounds(updated);
-      setRoundForm((f) => ({ ...f, title: "" }));
-    } catch (err) {
-      alert("Failed to add round");
-    }
+      await db.saveHackathon(hack);
+      setHacks([hack, ...hacks]);
+      setShowCreateForm(false);
+      setNewHack({ title: "", description: "", startDate: "", mode: "Online", prize: "$0" });
+      alert("New organizational node established.");
+    } catch (err) { alert("Initialization failed."); }
   };
-
-  const addCriterion = async () => {
-    if (!criteriaForm.hackathonId || !criteriaForm.roundId || !criteriaForm.name.trim()) return;
-    const next: ScoringCriterion = {
-      id: `crit-${Date.now()}`,
-      hackathonId: criteriaForm.hackathonId,
-      roundId: criteriaForm.roundId,
-      name: criteriaForm.name.trim(),
-      maxScore: Number(criteriaForm.maxScore) || 10,
-      weightage: Number(criteriaForm.weightage) || 0,
-    };
-    try {
-      await db.createScoringCriterion(next);
-      const updated = [...criteria, next];
-      setCriteria(updated);
-      setCriteriaForm((f) => ({ ...f, name: "" }));
-    } catch (err) {
-      alert("Failed to add criterion");
-    }
-  };
-
-  const addNotification = async () => {
-    if (!notificationForm.title.trim() || !notificationForm.message.trim()) return;
-    const next: NotificationItem = {
-      id: `note-${Date.now()}`,
-      title: notificationForm.title.trim(),
-      message: notificationForm.message.trim(),
-      roles: notificationForm.roles,
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      await db.createNotification(next);
-      const updated = [next, ...notifications];
-      setNotifications(updated);
-      setNotificationForm({ title: "", message: "", roles: ["participant"] });
-    } catch (err) {
-      alert("Failed to publish notification");
-    }
-  };
-
-  const toggleRole = (role: "admin" | "participant" | "judge") => {
-    setNotificationForm((f) => ({
-      ...f,
-      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
-    }));
-  };
-
-  const toggleLeaderboardVisibility = async () => {
-    const updated = { visible: !leaderboardConfig.visible };
-    try {
-      await db.updateLeaderboardConfig(updated);
-      setLeaderboardConfig(updated);
-    } catch (err) {
-      alert("Failed to update leaderboard visibility");
-    }
-  };
-
-
-  const exportJson = (filename: string, payload: unknown) => {
-    if (typeof window === "undefined") return;
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const nav: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { id: "hackathons", label: "Hackathons", icon: <Trophy className="h-4 w-4" /> },
-    { id: "rounds", label: "Rounds", icon: <FileText className="h-4 w-4" /> },
-    { id: "criteria", label: "Criteria", icon: <SlidersHorizontal className="h-4 w-4" /> },
-    { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
-  ];
 
   const Sidebar = () => (
-    <aside className="flex h-full w-56 flex-col border-r border-slate-800 bg-slate-950 p-4">
-      <div className="mb-6 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-500/10 border border-blue-500/40">
-          <Trophy className="h-4 w-4 text-blue-400" />
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border/60 p-6 flex flex-col z-30">
+      <div className="flex items-center gap-2.5 mb-10 pl-2 group cursor-pointer" onClick={() => router.push("/")}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm border border-border/40 group-hover:scale-110 transition-transform">
+          <Zap className="h-4 w-4 text-white" />
         </div>
-        <span className="text-sm font-semibold text-slate-50">NexusTrack</span>
+        <span className="text-xl font-black tracking-tight text-foreground font-sans italic">NexusTrack</span>
       </div>
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
+      
+      <p className="pl-2 mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Oversight</p>
       <nav className="flex-1 space-y-1">
-        {nav.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => { setTab(n.id); setSidebarOpen(false); }}
-            className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
-              tab === n.id
-                ? "bg-blue-500/10 text-blue-400 font-medium"
-                : "text-slate-400 hover:bg-slate-800 hover:text-slate-50"
-            }`}
-          >
+        {[
+          { id: "overview", label: "Protocol Hub", icon: <LayoutDashboard className="h-4 w-4" /> },
+          { id: "hacks", label: "Mission Registry", icon: <Trophy className="h-4 w-4" /> },
+          { id: "ops", label: "Operational Log", icon: <Activity className="h-4 w-4" /> },
+          { id: "security", label: "Access Rules", icon: <ShieldAlert className="h-4 w-4" /> },
+        ].map((n) => (
+          <button key={n.id} onClick={() => { setTab(n.id); setSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+              tab === n.id ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}>
             {n.icon} {n.label}
           </button>
         ))}
       </nav>
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-red-400 transition-colors"
-      >
-        <LogOut className="h-4 w-4" /> Logout
-      </button>
+
+      <div className="mt-auto pt-6 border-t border-border/60">
+        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 transition-colors">
+          <LogOut className="h-4 w-4" /> Terminate Link
+        </button>
+      </div>
     </aside>
   );
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden">
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex md:flex-col">
-        <Sidebar />
-      </div>
+    <div className="min-h-screen bg-background text-foreground flex selection:bg-primary/20">
+      <div className="hidden lg:block w-64 flex-shrink-0"><Sidebar /></div>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
-          <div className="flex flex-col w-56"><Sidebar /></div>
-          <div className="flex-1 bg-black/50" onClick={() => setSidebarOpen(false)} />
-        </div>
-      )}
-
-      {/* Main */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <button className="md:hidden text-slate-400" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-5 w-5" />
-            </button>
-            <h1 className="text-base font-semibold capitalize">{tab}</h1>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-20 flex items-center justify-between px-10 border-b border-border/60 bg-card/70 backdrop-blur-md sticky top-0 z-20">
+          <div className="flex items-center gap-4">
+            <button className="lg:hidden p-2 hover:bg-muted rounded-xl" onClick={() => setSidebarOpen(true)}><Menu className="w-5 h-5 text-muted-foreground" /></button>
+            <h1 className="text-sm font-black text-foreground tracking-widest uppercase italic">Administrator Priority Link</h1>
           </div>
-          <span className="text-xs text-slate-400">admin@test.com</span>
+          <div className="flex items-center gap-4 pl-6 border-l border-border">
+             <ThemeToggle />
+             <div className="flex flex-col items-end">
+                <span className="text-sm font-black text-foreground leading-none mb-0.5">{userName || userEmail}</span>
+                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Global Root</span>
+             </div>
+             <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-white dark:text-foreground flex items-center justify-center text-xs font-black text-white shadow-xl">R</div>
+          </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-
-          {/* OVERVIEW */}
+        <main className="p-10 max-w-7xl mx-auto w-full space-y-12">
+          
           {tab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {[
-                  { label: "Hackathons", value: hacks.length, color: "text-blue-400" },
-                  { label: "Rounds", value: rounds.length, color: "text-emerald-400" },
-                  { label: "Criteria", value: criteria.length, color: "text-amber-400" },
-                  { label: "Notifications", value: notifications.length, color: "text-purple-400" },
-                ].map((s) => (
-                  <Card key={s.label}>
-                    <CardContent className="p-4">
-                      <p className="text-xs text-slate-400">{s.label}</p>
-                      <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">All Hackathons</CardTitle></CardHeader>
-                <CardContent className="p-0">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-slate-800 text-xs text-slate-400">
-                      <tr>
-                        {["Title", "Start", "End", "Prize", "Status"].map((h) => (
-                          <th key={h} className="px-4 py-2 text-left font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hacks.map((h) => (
-                        <tr key={h.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                          <td className="px-4 py-2 font-medium">{h.title}</td>
-                          <td className="px-4 py-2 text-slate-400">{h.startDate}</td>
-                          <td className="px-4 py-2 text-slate-400">{h.endDate}</td>
-                          <td className="px-4 py-2 text-slate-400 capitalize">{h.mode}</td>
-                          <td className="px-4 py-2 text-blue-400">{h.prize}</td>
-                          <td className="px-4 py-2"><StatusBadge status={h.status} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Leaderboard Visibility</CardTitle></CardHeader>
-                <CardContent className="flex items-center justify-between">
-                  <p className="text-xs text-slate-400">
-                    Participants can {leaderboardConfig.visible ? "see" : "not see"} the leaderboard.
-                  </p>
-                  <Button size="sm" variant="outline" onClick={toggleLeaderboardVisibility}>
-                    {leaderboardConfig.visible ? "Hide Leaderboard" : "Show Leaderboard"}
+            <div className="space-y-12">
+               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <h2 className="text-4xl font-black tracking-tighter italic">Command Hub</h2>
+                    <p className="text-muted-foreground font-medium mt-1">Live synchronized status of the NexusTrack ecosystem.</p>
+                  </div>
+                  <Button size="sm" className="h-12 rounded-xl px-8 shadow-md shadow-primary/5" onClick={() => setTab("hacks")}>
+                    <Plus className="mr-2 w-4 h-4" /> Initialize Mission
                   </Button>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Data Health</CardTitle></CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border border-slate-800 px-3 py-2">
-                    <p className="text-xs text-slate-400">Hackathons missing rounds</p>
-                    <p className="text-lg font-semibold text-amber-400">{hackathonWithoutRounds}</p>
-                  </div>
-                  <div className="rounded-md border border-slate-800 px-3 py-2">
-                    <p className="text-xs text-slate-400">Rounds missing criteria</p>
-                    <p className="text-lg font-semibold text-amber-400">{roundsWithoutCriteria}</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Export Local Data</CardTitle></CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => exportJson("nexustrack-hackathons.json", hacks)}>Hackathons</Button>
-                  <Button size="sm" variant="outline" onClick={() => exportJson("nexustrack-rounds.json", rounds)}>Rounds</Button>
-                  <Button size="sm" variant="outline" onClick={() => exportJson("nexustrack-criteria.json", criteria)}>Criteria</Button>
-                  <Button size="sm" variant="outline" onClick={() => exportJson("nexustrack-notifications.json", notifications)}>Notifications</Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+               </div>
 
-          {/* HACKATHONS */}
-          {tab === "hackathons" && (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => setModal({})}>
-                  <Plus className="mr-1.5 h-4 w-4" /> Add Hackathon
-                </Button>
-              </div>
-              <Card>
-                <CardContent className="p-0">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-slate-800 text-xs text-slate-400">
-                      <tr>
-                        {["Title", "Dates", "Mode", "Prize", "Status", "Actions"].map((h) => (
-                          <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hacks.map((h) => (
-                        <tr key={h.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                          <td className="px-4 py-3">
-                            <p className="font-medium">{h.title}</p>
-                            <p className="text-xs text-slate-400 line-clamp-1">{h.description}</p>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-400">{h.startDate} → {h.endDate}</td>
-                          <td className="px-4 py-3 text-xs text-slate-400 capitalize">{h.mode}</td>
-                          <td className="px-4 py-3 text-blue-400 font-medium">{h.prize}</td>
-                          <td className="px-4 py-3"><StatusBadge status={h.status} /></td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-2">
-                              <button onClick={() => setModal(h)} className="text-slate-400 hover:text-blue-400">
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button onClick={() => deleteHack(h.id)} className="text-slate-400 hover:text-red-400">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {tab === "rounds" && (
-            <div className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Add Round</CardTitle></CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-4">
-                  <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    value={roundForm.hackathonId}
-                    onChange={(e) => setRoundForm((f) => ({ ...f, hackathonId: e.target.value }))}>
-                    <option value="">Select hackathon</option>
-                    {hacks.map((h) => <option key={h.id} value={h.id}>{h.title}</option>)}
-                  </select>
-                  <Input placeholder="Round title" value={roundForm.title}
-                    onChange={(e) => setRoundForm((f) => ({ ...f, title: e.target.value }))} />
-                  <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    value={roundForm.submissionType}
-                    onChange={(e) => setRoundForm((f) => ({ ...f, submissionType: e.target.value as SubmissionType }))}>
-                    <option value="ppt">ppt</option><option value="github">github</option>
-                    <option value="demo">demo</option><option value="mixed">mixed</option>
-                  </select>
-                  <Button onClick={addRound}><Plus className="mr-1.5 h-4 w-4" /> Add Round</Button>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-0">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-slate-800 text-xs text-slate-400">
-                      <tr>{["Hackathon", "Round", "Type", "Status"].map((h) => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {rounds.map((r) => (
-                        <tr key={r.id} className="border-b border-slate-800/50">
-                          <td className="px-4 py-3 text-slate-300">{hacks.find((h) => h.id === r.hackathonId)?.title ?? "Unknown"}</td>
-                          <td className="px-4 py-3 font-medium">{r.title}</td>
-                          <td className="px-4 py-3 text-slate-400">{r.submissionType}</td>
-                          <td className="px-4 py-3 text-slate-400">{r.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {tab === "criteria" && (
-            <div className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Add Scoring Criteria</CardTitle></CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-5">
-                  <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    value={criteriaForm.hackathonId}
-                    onChange={(e) => setCriteriaForm((f) => ({ ...f, hackathonId: e.target.value, roundId: "" }))}>
-                    <option value="">Hackathon</option>
-                    {hacks.map((h) => <option key={h.id} value={h.id}>{h.title}</option>)}
-                  </select>
-                  <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    value={criteriaForm.roundId}
-                    onChange={(e) => setCriteriaForm((f) => ({ ...f, roundId: e.target.value }))}>
-                    <option value="">Round</option>
-                    {rounds.filter((r) => r.hackathonId === criteriaForm.hackathonId).map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
-                  </select>
-                  <Input placeholder="Criterion name" value={criteriaForm.name}
-                    onChange={(e) => setCriteriaForm((f) => ({ ...f, name: e.target.value }))} />
-                  <Input placeholder="Max score" type="number" value={criteriaForm.maxScore}
-                    onChange={(e) => setCriteriaForm((f) => ({ ...f, maxScore: e.target.value }))} />
-                  <Input placeholder="Weightage %" type="number" value={criteriaForm.weightage}
-                    onChange={(e) => setCriteriaForm((f) => ({ ...f, weightage: e.target.value }))} />
-                </CardContent>
-              </Card>
-              <div className="flex justify-end"><Button onClick={addCriterion}>Save Criterion</Button></div>
-              <Card>
-                <CardContent className="space-y-2 p-4">
-                  {criteria.map((c) => (
-                    <div key={c.id} className="rounded-md border border-slate-800 px-3 py-2 text-sm">
-                      <span className="font-medium text-slate-200">{c.name}</span>
-                      <span className="ml-2 text-slate-400">({c.maxScore} max, {c.weightage}%)</span>
-                    </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  {[
+                    { label: "Active Nodes", value: hacks.length, icon: <Trophy className="w-4 h-4" /> },
+                    { label: "Phase Cycles", value: rounds.length, icon: <Activity className="w-4 h-4" /> },
+                    { label: "Human Units", value: "842", icon: <Users className="w-4 h-4" /> },
+                    { label: "Signal Density", value: "92%", icon: <Globe className="w-4 h-4" /> },
+                  ].map((stat, i) => (
+                    <Card key={i} className="p-6 premium-card border-none flex flex-col justify-between h-32">
+                      <div className="flex justify-between items-start">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{stat.label}</p>
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{stat.icon}</div>
+                      </div>
+                      <p className="text-2xl font-black tracking-tighter">{stat.value}</p>
+                    </Card>
                   ))}
-                </CardContent>
-              </Card>
+               </div>
+
+               <Card className="premium-card border-none shadow-xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
+                  <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 py-6 px-8">
+                     <CardTitle className="text-base font-black italic uppercase tracking-tight">Active Operation Log</CardTitle>
+                     <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5">Refresh Nodes</Button>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                           <thead className="bg-muted/50 border-b border-border/40">
+                              <tr>
+                                 {["Identifier", "Timeline", "Protocol Status", "Actions"].map(h => (
+                                   <th key={h} className="px-8 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{h}</th>
+                                 ))}
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-border/40">
+                              {hacks.map(h => (
+                                <tr key={h.id} className="hover:bg-muted/30 transition-colors group">
+                                  <td className="px-8 py-5 font-black text-foreground group-hover:text-primary transition-colors italic">{h.title}</td>
+                                  <td className="px-8 py-5 text-muted-foreground font-medium">{h.startDate}</td>
+                                  <td className="px-8 py-5">
+                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${
+                                       h.status === 'upcoming' ? 'bg-indigo-50/50 text-indigo-600 border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20' : 
+                                       h.status === 'ongoing' ? 'bg-emerald-50/50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' : 
+                                       'bg-slate-50/50 text-slate-400 border-slate-100 dark:bg-slate-500/10 dark:border-slate-500/20'
+                                     }`}>
+                                       {h.status}
+                                     </span>
+                                  </td>
+                                  <td className="px-8 py-5">
+                                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary"><Edit2 className="w-4 h-4" /></Button>
+                                  </td>
+                                </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     </div>
+                  </CardContent>
+               </Card>
             </div>
           )}
 
-          {tab === "notifications" && (
-            <div className="space-y-4 max-w-3xl">
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Create Notification</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <Input placeholder="Title" value={notificationForm.title}
-                    onChange={(e) => setNotificationForm((f) => ({ ...f, title: e.target.value }))} />
-                  <textarea
-                    rows={3}
-                    value={notificationForm.message}
-                    onChange={(e) => setNotificationForm((f) => ({ ...f, message: e.target.value }))}
-                    className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    placeholder="Message"
-                  />
-                  <div className="flex gap-2">
-                    {(["admin", "participant", "judge"] as const).map((role) => (
-                      <Button key={role} size="sm" variant={notificationForm.roles.includes(role) ? "default" : "outline"}
-                        onClick={() => toggleRole(role)}>{role}</Button>
-                    ))}
+          {tab === "hacks" && (
+            <div className="space-y-12">
+               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <h2 className="text-4xl font-black tracking-tighter italic">Mission Registry</h2>
+                    <p className="text-muted-foreground font-medium mt-1">Configure and deploy new organization nodes.</p>
                   </div>
-                  <Button onClick={addNotification}><Bell className="mr-1.5 h-4 w-4" /> Publish</Button>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Recent Notifications</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {notifications.length === 0 && (
-                    <p className="text-sm text-slate-400">No notifications published yet.</p>
-                  )}
-                  {notifications.map((n) => (
-                    <div key={n.id} className="rounded-md border border-slate-800 px-3 py-2">
-                      <p className="text-sm font-medium">{n.title}</p>
-                      <p className="text-xs text-slate-400">{n.message}</p>
-                      <p className="text-[11px] text-slate-500 mt-1">Roles: {Array.isArray(n.roles) ? n.roles.join(", ") : "all"}</p>
+                  <Button className="h-12 rounded-xl px-8 shadow-md shadow-primary/5" onClick={() => setShowCreateForm(!showCreateForm)}>
+                    {showCreateForm ? "Cancel Operation" : "Provision New Node"}
+                  </Button>
+               </div>
+
+               {showCreateForm && (
+                 <Card className="premium-card p-10 border-none shadow-2xl space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="grid md:grid-cols-2 gap-8">
+                       <div className="space-y-6">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Signal Identifier (Title)</label>
+                             <Input placeholder="AI Innovation Sprint" value={newHack.title} onChange={e => setNewHack({...newHack, title: e.target.value})} className="h-12 rounded-2xl" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Mission Parameters (Description)</label>
+                             <Input placeholder="Describe the mission goal..." value={newHack.description} onChange={e => setNewHack({...newHack, description: e.target.value})} className="h-12 rounded-2xl" />
+                          </div>
+                       </div>
+                       <div className="space-y-6">
+                          <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Start Protocol</label>
+                                <Input type="date" value={newHack.startDate} onChange={e => setNewHack({...newHack, startDate: e.target.value})} className="h-12 rounded-2xl" />
+                             </div>
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Prize Node</label>
+                                <Input placeholder="$10,000" value={newHack.prize} onChange={e => setNewHack({...newHack, prize: e.target.value})} className="h-12 rounded-2xl" />
+                             </div>
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Operational Mode</label>
+                             <select 
+                                className="flex h-12 w-full rounded-2xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none transition-all"
+                                value={newHack.mode} onChange={e => setNewHack({...newHack, mode: e.target.value})}
+                             >
+                                <option>Online</option>
+                                <option>Hybrid</option>
+                                <option>In-Person</option>
+                             </select>
+                          </div>
+                       </div>
                     </div>
+                    <Button className="w-full h-14 rounded-2xl font-black text-base shadow-xl" onClick={createHackathon}>Broadcast New Mission</Button>
+                 </Card>
+               )}
+
+               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {hacks.map(h => (
+                    <Card key={h.id} className="premium-card p-8 border-none flex flex-col group">
+                       <div className="flex justify-between items-start mb-6">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${
+                              h.status === 'upcoming' ? 'bg-indigo-50/50 text-indigo-600 border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20' : 
+                              h.status === 'ongoing' ? 'bg-emerald-50/50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' : 
+                              'bg-slate-50/50 text-slate-400 border-slate-100 dark:bg-slate-500/10 dark:border-slate-500/20'
+                            }`}>
+                              {h.status}
+                          </span>
+                          <span className="text-xs font-black text-primary uppercase tracking-widest">{h.mode}</span>
+                       </div>
+                       <h4 className="text-xl font-black tracking-tight italic mb-3 group-hover:text-primary transition-colors">{h.title}</h4>
+                       <p className="text-xs font-medium text-muted-foreground line-clamp-2 mb-8">{h.description}</p>
+                       <div className="mt-auto flex justify-between items-center pt-6 border-t border-border/40">
+                          <div className="flex flex-col">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase">Launch</span>
+                             <span className="text-sm font-bold italic">{h.startDate}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="rounded-xl hover:bg-primary/10 text-primary transition-all group-hover:translate-x-1"><ChevronRight className="w-5 h-5" /></Button>
+                       </div>
+                    </Card>
                   ))}
-                </CardContent>
-              </Card>
+               </div>
             </div>
           )}
         </main>
       </div>
 
-      {/* Modal */}
-      {modal !== undefined && (
-        <HackathonModal
-          hack={modal}
-          onClose={() => setModal(undefined)}
-          onSave={saveHack}
-        />
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed left-0 top-0 bottom-0 w-72 bg-card transition-transform duration-500"><Sidebar /></div>
+        </div>
       )}
     </div>
   );
